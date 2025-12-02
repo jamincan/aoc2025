@@ -2,20 +2,9 @@ use std::env;
 
 mod day1;
 
-const SOLUTIONS: [[fn(); 2]; 12] = [
-    [|| not_implemented(1, 1), || not_implemented(1, 2)],
-    [|| not_implemented(2, 1), || not_implemented(2, 2)],
-    [|| not_implemented(3, 1), || not_implemented(3, 2)],
-    [|| not_implemented(4, 1), || not_implemented(4, 2)],
-    [|| not_implemented(5, 1), || not_implemented(5, 2)],
-    [|| not_implemented(6, 1), || not_implemented(6, 2)],
-    [|| not_implemented(7, 1), || not_implemented(7, 2)],
-    [|| not_implemented(8, 1), || not_implemented(8, 2)],
-    [|| not_implemented(9, 1), || not_implemented(9, 2)],
-    [|| not_implemented(10, 1), || not_implemented(10, 2)],
-    [|| not_implemented(11, 1), || not_implemented(11, 2)],
-    [|| not_implemented(12, 1), || not_implemented(12, 2)],
-];
+const LAST_DAY: usize = 1;
+
+const SOLUTIONS: [[fn(); 2]; LAST_DAY] = [[day1::part1, day1::part2]];
 
 /**
  * Usage: aoc2025 [DAY] [PART]
@@ -32,8 +21,11 @@ fn main() {
 
     if let Some(day) = day {
         // Parse and validate inputs
-        let Ok(day @ 1..=12) = day.parse::<usize>() else {
-            eprintln!("Invalid input '{day}' for day. Must be between 1 and 12.");
+        let Ok(day @ 1..=LAST_DAY) = day.parse::<usize>() else {
+            eprintln!(
+                "Invalid input '{day}' for day. Must be between 1 and {}.",
+                LAST_DAY
+            );
             return;
         };
         let part = part.and_then(|part| {
@@ -46,23 +38,29 @@ fn main() {
 
         // Run specified solution
         match part {
-            Some(part) => SOLUTIONS[day - 1][part - 1](),
+            Some(part) => run(SOLUTIONS[day - 1][part - 1], day, part),
             None => {
-                SOLUTIONS[day - 1][0]();
-                SOLUTIONS[day - 1][1]();
+                run(SOLUTIONS[day - 1][0], day, 1);
+                run(SOLUTIONS[day - 1][1], day, 2);
             }
         }
     } else {
         // No arguments provided, go through all solutions
-        for [part1, part2] in SOLUTIONS {
-            part1();
-            part2();
+        for (n, [part1, part2]) in SOLUTIONS.iter().enumerate() {
+            let day = n + 1;
+            run(*part1, day, 1);
+            run(*part2, day, 2);
         }
         return;
     }
 }
 
-/** Print out a not implemented message for the specified day and part */
-fn not_implemented(day: u8, part: u8) {
-    println!("Advent of Code Day {day} Part {part} is not yet implemented.");
+fn run(solution: fn(), day: usize, part: usize) {
+    use std::time::Instant;
+
+    println!("Day {day}, Part {part}:");
+    let now = Instant::now();
+    solution();
+    let elapsed = now.elapsed().as_millis();
+    println!("{elapsed}ms elapsed");
 }
