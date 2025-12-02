@@ -2,3 +2,7 @@
 name = "aoc2025"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+ilog = "1.0.1"
+regex = "1.12.2"

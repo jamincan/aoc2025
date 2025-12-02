@@ -1,10 +1,11 @@
 use std::env;
 
 mod day1;
+mod day2;
 
-const LAST_DAY: usize = 1;
+const LAST_DAY: usize = 2;
 
-const SOLUTIONS: [[fn(); 2]; LAST_DAY] = [[day1::part1, day1::part2]];
+const SOLUTIONS: [[fn(); 2]; LAST_DAY] = [[day1::part1, day1::part2], [day2::part1, day2::part2]];
 
 /**
  * Usage: aoc2025 [DAY] [PART]
