@@ -28,14 +28,14 @@ impl Grid {
 
     fn neighbors(&self, x: usize, y: usize) -> impl Iterator<Item = (usize, usize)> + '_ {
         [
-            (y > 0 && x > 0).then_some((x - 1, y - 1)),
-            (y > 0).then_some((x, y - 1)),
-            (y > 0 && x < self.width - 1).then_some((x + 1, y - 1)),
-            (x > 0).then_some((x - 1, y)),
-            (x < self.width - 1).then_some((x + 1, y)),
-            (y < self.height - 1 && x > 0).then_some((x - 1, y + 1)),
-            (y < self.height - 1).then_some((x, y + 1)),
-            (y < self.height - 1 && x < self.width - 1).then_some((x + 1, y + 1)),
+            (y > 0 && x > 0).then(|| (x - 1, y - 1)),
+            (y > 0).then(|| (x, y - 1)),
+            (y > 0 && x < self.width - 1).then(|| (x + 1, y - 1)),
+            (x > 0).then(|| (x - 1, y)),
+            (x < self.width - 1).then(|| (x + 1, y)),
+            (y < self.height - 1 && x > 0).then(|| (x - 1, y + 1)),
+            (y < self.height - 1).then(|| (x, y + 1)),
+            (y < self.height - 1 && x < self.width - 1).then(|| (x + 1, y + 1)),
         ]
         .into_iter()
         .flatten()
