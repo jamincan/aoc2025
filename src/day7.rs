@@ -13,13 +13,7 @@ fn parse_manifold(input: &str) -> Vec<Vec<usize>> {
         .lines()
         .map(|line| {
             line.char_indices()
-                .filter_map(|(idx, ch)| {
-                    if ch == 'S' || ch == '^' {
-                        Some(idx)
-                    } else {
-                        None
-                    }
-                })
+                .filter_map(|(idx, ch)| matches!(ch, 'S' | '^').then_some(idx))
                 .collect()
         })
         .collect()
@@ -52,14 +46,8 @@ fn solution2(input: &str) -> u64 {
     for row in &manifold[1..] {
         for split in row {
             if let Some(beam_count) = current_beams.remove(split) {
-                current_beams
-                    .entry(split - 1)
-                    .and_modify(|cnt| *cnt += beam_count)
-                    .or_insert(beam_count);
-                current_beams
-                    .entry(split + 1)
-                    .and_modify(|cnt| *cnt += beam_count)
-                    .or_insert(beam_count);
+                *current_beams.entry(split - 1).or_default() += beam_count;
+                *current_beams.entry(split + 1).or_default() += beam_count;
             }
         }
     }
