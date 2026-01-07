@@ -85,18 +85,56 @@ fn solution1(input: &str) -> usize {
 
 fn solution2(input: &str) -> usize {
     let mut grid = parse_grid(input);
+    let mut neighbor_counts = vec![0u8; grid.cells.len()];
     let mut removed_paper = 0;
+    let mut to_check = Vec::new();
 
-    loop {
-        let paper_to_move = get_paper_to_move(&grid);
-        if paper_to_move.is_empty() {
-            break;
-        }
-        removed_paper += paper_to_move.len();
-        for (x, y) in paper_to_move.into_iter() {
-            *grid.get_mut(x, y) = Cell::Empty;
+    // cache the number of adjacent cells that are paper for each cell
+    // and if the count is less than four, add it to the cells to check
+    for y in 0..grid.height {
+        for x in 0..grid.width {
+            if grid.get(x, y) == Cell::Paper {
+                let count = grid
+                    .neighbors(x, y)
+                    .filter(|(nx, ny)| grid.get(*nx, *ny) == Cell::Paper)
+                    .count();
+                neighbor_counts[y * grid.width + x] = count as u8;
+                if count < 4 {
+                    to_check.push((x, y))
+                };
+            }
         }
     }
+
+    while !to_check.is_empty() {
+        let mut next_to_check = HashSet::new();
+
+        for &(x, y) in &to_check {
+            let idx = y * grid.width + x;
+
+            if grid.get(x, y) == Cell::Empty {
+                continue;
+            }
+
+            if neighbor_counts[idx] < 4 {
+                *grid.get_mut(x, y) = Cell::Empty;
+                removed_paper += 1;
+
+                // fix neighbor count for adjacent cells and add neighbours in the next cells to check
+                for (nx, ny) in grid.neighbors(x, y) {
+                    let n_idx = ny * grid.width + nx;
+                    if grid.get(nx, ny) == Cell::Paper {
+                        neighbor_counts[n_idx] -= 1;
+                        next_to_check.insert((nx, ny));
+                    }
+                }
+            }
+        }
+
+        to_check.clear();
+        to_check.extend(next_to_check.iter());
+    }
+
     removed_paper
 }
 
