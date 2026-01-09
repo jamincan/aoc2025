@@ -1,24 +1,6 @@
 use std::env;
 
-mod day1;
-mod day2;
-mod day3;
-mod day4;
-mod day5;
-mod day6;
-mod day7;
-
-const LAST_DAY: usize = SOLUTIONS.len();
-
-const SOLUTIONS: [[fn(); 2]; 7] = [
-    [day1::part1, day1::part2],
-    [day2::part1, day2::part2],
-    [day3::part1, day3::part2],
-    [day4::part1, day4::part2],
-    [day5::part1, day5::part2],
-    [day6::part1, day6::part2],
-    [day7::part1, day7::part2],
-];
+mod days;
 
 /**
  * Usage: aoc2025 [DAY] [PART]
@@ -35,10 +17,10 @@ fn main() {
 
     if let Some(day) = day {
         // Parse and validate inputs
-        let Ok(day @ 1..=LAST_DAY) = day.parse::<usize>() else {
+        let Ok(day @ 1..=days::COUNT) = day.parse::<usize>() else {
             eprintln!(
                 "Invalid input '{day}' for day. Must be between 1 and {}.",
-                LAST_DAY
+                days::COUNT
             );
             return;
         };
@@ -52,15 +34,15 @@ fn main() {
 
         // Run specified solution
         match part {
-            Some(part) => run(SOLUTIONS[day - 1][part - 1], day, part),
+            Some(part) => run(days::SOLUTIONS[day - 1][part - 1], day, part),
             None => {
-                run(SOLUTIONS[day - 1][0], day, 1);
-                run(SOLUTIONS[day - 1][1], day, 2);
+                run(days::SOLUTIONS[day - 1][0], day, 1);
+                run(days::SOLUTIONS[day - 1][1], day, 2);
             }
         }
     } else {
         // No arguments provided, go through all solutions
-        for (n, [part1, part2]) in SOLUTIONS.iter().enumerate() {
+        for (n, [part1, part2]) in days::SOLUTIONS.iter().enumerate() {
             let day = n + 1;
             run(*part1, day, 1);
             run(*part2, day, 2);
