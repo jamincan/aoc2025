@@ -1,7 +1,4 @@
-use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, HashMap},
-};
+use std::{cmp::Reverse, collections::BinaryHeap};
 
 const INPUT: &str = include_str!("input/day8.txt");
 
@@ -24,95 +21,109 @@ fn parse_points(input: &str) -> Vec<[i64; 3]> {
         .collect()
 }
 
-fn solution1<const N: usize>(input: &str) -> u64 {
+struct UnionFind {
+    parent: Vec<usize>,
+    size: Vec<usize>,
+}
+
+impl UnionFind {
+    fn new(n: usize) -> Self {
+        UnionFind {
+            parent: (0..n).collect(),
+            size: vec![1; n],
+        }
+    }
+
+    fn find(&mut self, x: usize) -> usize {
+        if self.parent[x] != x {
+            self.parent[x] = self.find(self.parent[x]);
+        }
+        self.parent[x]
+    }
+
+    fn union(&mut self, x: usize, y: usize) -> bool {
+        let root_x = self.find(x);
+        let root_y = self.find(y);
+
+        if root_x == root_y {
+            return false;
+        }
+
+        if self.size[root_x] < self.size[root_y] {
+            self.parent[root_x] = root_y;
+            self.size[root_y] += self.size[root_x];
+        } else {
+            self.parent[root_y] = root_x;
+            self.size[root_x] += self.size[root_y];
+        }
+        true
+    }
+
+    fn get_sizes(&self) -> impl Iterator<Item = usize> {
+        (0..self.parent.len())
+            .filter(|&i| self.parent[i] == i)
+            .map(|root| self.size[root])
+    }
+}
+
+fn solution1<const N: usize>(input: &str) -> usize {
     let points = parse_points(input);
-    // find the distance between each pair of points and add to a binary heap
-    let mut closest_pairs = BinaryHeap::new();
-    for i in 0..points.len() - 1 {
-        let (&[cx, cy, cz], remaining) = points[i..].split_first().unwrap();
-        for &[x, y, z] in remaining {
-            let distance = (cx - x).pow(2) + (cy - y).pow(2) + (cz - z).pow(2);
-            closest_pairs.push((Reverse(distance), [cx, cy, cz], [x, y, z]));
+    let n = points.len();
+
+    // find the distance squared between each pair of points and add their indices
+    // to a max heap sorted in reverse by the distance squared
+    let mut closest_pairs = BinaryHeap::with_capacity(n * (n - 1) / 2);
+    for i in 0..n - 1 {
+        let [cx, cy, cz] = points[i];
+        for j in i + 1..n {
+            let [x, y, z] = points[j];
+            let dist_sq = (cx - x).pow(2) + (cy - y).pow(2) + (cz - z).pow(2);
+            closest_pairs.push((Reverse(dist_sq), i, j));
         }
     }
-    let closest_pairs = std::iter::from_fn(move || closest_pairs.pop()).take(N);
 
-    // use a crude disjoint-set to determine the circuits
-    fn find(parent: &mut [usize], idx: usize) -> usize {
-        if parent[idx] != idx {
-            parent[idx] = find(parent, parent[idx]);
+    let mut uf = UnionFind::new(n);
+
+    // process only the N closest pairs
+    for _ in 0..N {
+        if let Some((_, i, j)) = closest_pairs.pop() {
+            uf.union(i, j);
         }
-        parent[idx]
     }
 
-    let mut circuit = Vec::from_iter(0..points.len());
-    let mut pt_to_circuit_idx = HashMap::with_capacity(points.len());
-    for (_, a, b) in closest_pairs {
-        let len = pt_to_circuit_idx.len();
-        let circuit_idx_a = *pt_to_circuit_idx.entry(a).or_insert(len);
-        let len = pt_to_circuit_idx.len();
-        let circuit_idx_b = *pt_to_circuit_idx.entry(b).or_insert(len);
-
-        let root_a = find(&mut circuit, circuit_idx_a);
-        let root_b = find(&mut circuit, circuit_idx_b);
-        if root_a == root_b {
-            // they're already in the same circuit
-            continue;
-        }
-        circuit[root_a] = root_b;
-    }
-
-    let mut sizes: HashMap<usize, u64> = HashMap::new();
-    for idx in 0..circuit.len() {
-        let root_idx = find(&mut circuit, idx);
-        *sizes.entry(root_idx).or_default() += 1;
-    }
-    let mut largest = BinaryHeap::from_iter(sizes.values());
-    largest.pop().unwrap() * largest.pop().unwrap() * largest.pop().unwrap()
+    let mut sizes: Vec<_> = uf.get_sizes().map(Reverse).collect();
+    sizes.sort_unstable();
+    sizes[0].0 * sizes[1].0 * sizes[2].0
 }
 
 fn solution2(input: &str) -> i64 {
     let points = parse_points(input);
-    // find the distance between each pair of points and add to a binary heap
-    let mut closest_pairs = BinaryHeap::new();
-    for i in 0..points.len() - 1 {
-        let (&[cx, cy, cz], remaining) = points[i..].split_first().unwrap();
-        for &[x, y, z] in remaining {
-            let distance = (cx - x).pow(2) + (cy - y).pow(2) + (cz - z).pow(2);
-            closest_pairs.push((distance, [cx, cy, cz], [x, y, z]));
+    let n = points.len();
+
+    // find the distance squared between each point and then sort with max distance
+    // squared last
+    let mut pairs = Vec::with_capacity(n * (n - 1) / 2);
+    for i in 0..n - 1 {
+        let [cx, cy, cz] = points[i];
+        for j in i + 1..n {
+            let [x, y, z] = points[j];
+            let dist_sq = (cx - x).pow(2) + (cy - y).pow(2) + (cz - z).pow(2);
+            pairs.push((dist_sq, i, j));
         }
     }
-    let closest_pairs = closest_pairs.into_sorted_vec();
+    pairs.sort_unstable();
 
-    // use a crude disjoint-set to determine the circuits
-    fn find(parent: &mut [usize], idx: usize) -> usize {
-        if parent[idx] != idx {
-            parent[idx] = find(parent, parent[idx]);
+    let mut uf = UnionFind::new(n);
+    let mut last_pair = None;
+
+    for (_, i, j) in pairs {
+        if uf.union(i, j) {
+            last_pair = Some((i, j));
         }
-        parent[idx]
     }
 
-    let mut circuit = Vec::from_iter(0..points.len());
-    let mut pt_to_circuit_idx = HashMap::with_capacity(points.len());
-    let mut last_pair_to_join = None;
-    for (_, a, b) in closest_pairs {
-        let len = pt_to_circuit_idx.len();
-        let circuit_idx_a = *pt_to_circuit_idx.entry(a).or_insert(len);
-        let len = pt_to_circuit_idx.len();
-        let circuit_idx_b = *pt_to_circuit_idx.entry(b).or_insert(len);
-
-        let root_a = find(&mut circuit, circuit_idx_a);
-        let root_b = find(&mut circuit, circuit_idx_b);
-        if root_a == root_b {
-            // they're already in the same circuit
-            continue;
-        }
-        circuit[root_a] = root_b;
-        last_pair_to_join = Some((a, b));
-    }
-
-    let (a, b) = last_pair_to_join.unwrap();
-    a[0] * b[0]
+    let (i, j) = last_pair.unwrap();
+    points[i][0] * points[j][0]
 }
 
 #[cfg(test)]
