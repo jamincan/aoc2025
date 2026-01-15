@@ -8,10 +8,7 @@ pub fn part2() {
     println!("{}", solution2(INPUT));
 }
 
-fn parse_points<T>(input: &str) -> Vec<[T; 2]>
-where
-    T: std::str::FromStr<Err: std::fmt::Debug>,
-{
+fn parse_points(input: &str) -> Vec<[i64; 2]> {
     input
         .lines()
         .map(|line| {
@@ -22,7 +19,7 @@ where
 }
 
 fn solution1(input: &str) -> i64 {
-    let points = parse_points::<i64>(input);
+    let points = parse_points(input);
     let n = points.len();
 
     let mut areas = Vec::with_capacity(n * (n - 1) / 2);
@@ -40,7 +37,7 @@ fn solution1(input: &str) -> i64 {
 }
 
 fn solution2(input: &str) -> i64 {
-    let points = parse_points::<i64>(input);
+    let points = parse_points(input);
 
     // find all rectangles to test and sort by area
     let n = points.len();
@@ -51,124 +48,194 @@ fn solution2(input: &str) -> i64 {
             let [bx, by] = points[j];
             let dx = (bx - ax).abs() + 1;
             let dy = (by - ay).abs() + 1;
-            rectangles.push((dx * dy, [ax, ay], [bx, by]));
+            rectangles.push((dx * dy, Rect::new(ax, ay, bx, by)));
         }
     }
-    rectangles.sort_unstable();
+    rectangles.sort_unstable_by_key(|&(area, _)| area);
 
     // find the vertical edges of the polygon as with the winding number test we
     // are doing, only the vertical edges matter
-    let polygon = get_edges(&points);
+    let (vertical_edges, horizontal_edges) = get_separated_edges(&points);
 
     // check rectangles by largest area first and return first that is contained
     rectangles
         .into_iter()
         .rev()
-        .find(|&(_, a, b)| check_if_rectangle_is_contained(&polygon, [a, b]))
-        .map(|(area, _, _)| area)
+        .find(|&(_, rect)| rect.check(&vertical_edges, &horizontal_edges))
+        .map(|(area, _)| area)
         .unwrap()
 }
 
-type Point = [i64; 2];
-type Edge = [Point; 2];
-
-fn get_edges(points: &[Point]) -> Vec<Edge> {
-    let mut edges = Vec::with_capacity(points.len() / 2 + 1);
-    for pair in points.windows(2) {
-        let a = pair[0];
-        let b = pair[1];
-        edges.push([a, b])
-    }
-
-    // add edge connecting first and last point if it's vertical
-    let first = points[0];
-    let last = points[points.len() - 1];
-    edges.push([last, first]);
-    edges
+#[derive(Clone, Copy, Debug)]
+struct VerticalEdge {
+    x: i64,
+    min_y: i64,
+    max_y: i64,
+    up: bool,
 }
 
-fn check_if_rectangle_is_contained(polygon: &[Edge], rect: [Point; 2]) -> bool {
-    // first shrink the rectangle by 0.5 inward to help deal with instances where the rectangle coincides with an edge
-    let [a, b] = rect;
-    let pts = [a, [a[0], b[1]], [b[0], a[1]], b];
-    let edges = get_edges(&pts);
-
-    // check if any edges intersect
-    if check_for_edge_intersection(polygon, &edges) {
-        return false;
-    }
-
-    // check that all points are contained
-    pts.iter()
-        .all(|pt| check_if_point_is_contained(polygon, pt))
+#[derive(Clone, Copy, Debug)]
+struct HorizontalEdge {
+    y: i64,
+    min_x: i64,
+    max_x: i64,
 }
 
-// check polygon and rectangle edges to see if rectangle edges intersect polygon edges
-// edges that overlap are not considered
-fn check_for_edge_intersection(polygon_edges: &[Edge], rect_edges: &[Edge]) -> bool {
-    for &[p1, p2] in polygon_edges {
-        for &[r1, r2] in rect_edges {
-            if p1[0] == p2[0] && r1[1] == r2[1] {
-                // polygon edge is vertical and rect edge is horizontal
-                let min_py = p1[1].min(p2[1]);
-                let max_py = p1[1].max(p2[1]);
-                let min_rx = r1[0].min(r2[0]);
-                let max_rx = r1[0].max(r2[0]);
-                if min_py < r1[1] && r1[1] < max_py && min_rx < p1[0] && p1[0] < max_rx {
-                    return true;
-                }
-            } else if p1[1] == p2[1] && r1[0] == r2[0] {
-                // polygon edge is horizontal and rect edge is vertical
-                let min_px = p1[0].min(p2[0]);
-                let max_px = p1[0].max(p2[0]);
-                let min_ry = r1[1].min(r2[1]);
-                let max_ry = r1[1].max(r2[1]);
-                if min_px < r1[0] && r1[0] < max_px && min_ry < p1[1] && p1[1] < max_ry {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+#[derive(Clone, Copy, Debug)]
+struct Rect {
+    min_x: i64,
+    max_x: i64,
+    min_y: i64,
+    max_y: i64,
 }
 
-/// check if a point is in the polygon using Dan Sunday's winding number algorithm
-fn check_if_point_is_contained(polygon: &[Edge], pt: &Point) -> bool {
-    let mut winding_num = 0;
-    let mut touching_edges = vec![];
-
-    for &[a, b] in polygon {
-        if a[0] == b[0] {
-            // vertical polygon edge with point on edge; skip winding num and just check if point is on edge
-            if a[0] == pt[0] {
-                let min_py = a[1].min(b[1]);
-                let max_py = a[1].max(b[1]);
-                if pt[1] >= min_py && pt[1] <= max_py {
-                    return true;
-                }
-            }
-            // vertical polygon without point on edge - use winding number
-            else if a[1] <= pt[1] && b[1] > pt[1] && pt[0] < a[0] {
-                // upward crossing to the right
-                touching_edges.push([a, b]);
-                winding_num += 1;
-            } else if a[1] > pt[1] && b[1] <= pt[1] && pt[0] < a[0] {
-                // downward crossing to the right
-                touching_edges.push([a, b]);
-                winding_num -= 1;
-            }
-        } else if a[1] == pt[1] {
-            // horizontal polygon edge with point on edge; skip winding num and just check if point is on edge
-            let min_px = a[0].min(b[0]);
-            let max_px = a[0].max(b[0]);
-            if pt[0] >= min_px && pt[0] <= max_px {
-                return true;
-            }
+impl Rect {
+    fn new(ax: i64, ay: i64, bx: i64, by: i64) -> Self {
+        Self {
+            min_x: ax.min(bx),
+            max_x: ax.max(bx),
+            min_y: ay.min(by),
+            max_y: ay.max(by),
         }
     }
 
-    // if the winding number isn't 0, we know that the point is in the polygon
-    winding_num != 0
+    fn corners(&self) -> impl Iterator<Item = [i64; 2]> {
+        [
+            [self.min_x, self.min_y],
+            [self.min_x, self.max_y],
+            [self.max_x, self.min_y],
+            [self.max_x, self.max_y],
+        ]
+        .into_iter()
+    }
+
+    fn check(&self, vertical_edges: &[VerticalEdge], horizontal_edges: &[HorizontalEdge]) -> bool {
+        !has_intersection(vertical_edges, horizontal_edges, *self)
+            && self
+                .corners()
+                .all(|[x, y]| is_corner_contained(vertical_edges, horizontal_edges, x, y))
+    }
+}
+
+fn get_separated_edges(points: &[[i64; 2]]) -> (Vec<VerticalEdge>, Vec<HorizontalEdge>) {
+    let mut vert = vec![];
+    let mut horiz = vec![];
+
+    for window in points.windows(2) {
+        let [x1, y1] = window[0];
+        let [x2, y2] = window[1];
+        if x1 == x2 {
+            // vertical
+            vert.push(VerticalEdge {
+                x: x1,
+                min_y: y1.min(y2),
+                max_y: y1.max(y2),
+                up: y2 > y1,
+            });
+        } else {
+            //horizontal
+            horiz.push(HorizontalEdge {
+                y: y1,
+                min_x: x1.min(x2),
+                max_x: x1.max(x2),
+            });
+        }
+    }
+
+    // close the loop
+    let [fx, fy] = points[0];
+    let [lx, ly] = *points.last().unwrap();
+    if fx == lx {
+        vert.push(VerticalEdge {
+            x: fx,
+            min_y: fy.min(ly),
+            max_y: fy.max(ly),
+            up: fy > ly,
+        });
+    } else {
+        horiz.push(HorizontalEdge {
+            y: fy,
+            min_x: fx.min(lx),
+            max_x: fx.max(lx),
+        });
+    }
+
+    (vert, horiz)
+}
+
+/// check a rectangle against both vertical and horizontal edges of polygon for intersections
+/// and return true if any are found
+fn has_intersection(
+    vertical_edges: &[VerticalEdge],
+    horizontal_edges: &[HorizontalEdge],
+    rect: Rect,
+) -> bool {
+    for &VerticalEdge {
+        x, min_y, max_y, ..
+    } in vertical_edges
+    {
+        if rect.min_x < x && x < rect.max_x {
+            // vertical edge is between rectangles x bounds
+            if min_y < rect.min_y && rect.min_y < max_y {
+                return true; // crosses bottom edge of rect
+            }
+            if min_y < rect.max_y && rect.max_y < max_y {
+                return true; // crosses top edge of rect
+            }
+        }
+    }
+    for &HorizontalEdge { y, min_x, max_x } in horizontal_edges {
+        if rect.min_y < y && y < rect.max_y {
+            // horiz edge is between rectangles x bounds
+            if min_x < rect.min_x && rect.min_x < max_x {
+                return true; // crosses left edge of rect
+            }
+            if min_x < rect.max_x && rect.max_x < max_x {
+                return true; // crosses right edge of rect
+            }
+        }
+    }
+    // no intersections
+    false
+}
+
+fn is_corner_contained(
+    vertical_edges: &[VerticalEdge],
+    horizontal_edges: &[HorizontalEdge],
+    px: i64,
+    py: i64,
+) -> bool {
+    // check if point is on horizontal edges
+    for &HorizontalEdge { y, min_x, max_x } in horizontal_edges {
+        if y == py && px >= min_x && px <= max_x {
+            return true;
+        }
+    }
+
+    // check vertical edges
+    let mut winding = 0;
+    for &VerticalEdge {
+        x,
+        min_y,
+        max_y,
+        up,
+    } in vertical_edges
+    {
+        // check if point is on vertical edge
+        if x == px && py >= min_y && py <= max_y {
+            return true;
+        }
+
+        // point is left of edge, update the winding number
+        if px < x && min_y <= py && py < max_y {
+            if up {
+                winding += 1;
+            } else {
+                winding -= 1;
+            }
+        }
+    }
+    winding != 0
 }
 
 #[cfg(test)]
@@ -190,62 +257,21 @@ mod tests {
     #[test]
     fn correctly_check_rectangles() {
         let points = parse_points(INPUT);
-        let polygon = get_edges(&points);
+        let (vert, horiz) = get_separated_edges(&points);
         let rectangles = [
-            ([[7, 3], [11, 1]], true),
-            ([[9, 7], [9, 5]], true),
-            ([[9, 5], [2, 3]], true),
-            ([[11, 1], [2, 5]], false),
-            ([[7, 1], [11, 7]], false),
-            ([[7, 1], [9, 7]], false),
-            ([[7, 1], [9, 5]], true),
-            ([[7, 1], [2, 5]], false),
-            ([[7, 1], [2, 3]], false),
+            (Rect::new(7, 3, 11, 1), true),
+            (Rect::new(9, 7, 9, 5), true),
+            (Rect::new(9, 5, 2, 3), true),
+            (Rect::new(11, 1, 2, 5), false),
+            (Rect::new(7, 1, 11, 7), false),
+            (Rect::new(7, 1, 9, 7), false),
+            (Rect::new(7, 1, 9, 5), true),
+            (Rect::new(7, 1, 2, 5), false),
+            (Rect::new(7, 1, 2, 3), false),
         ];
         for (rect, result) in rectangles {
-            assert_eq!(check_if_rectangle_is_contained(&polygon, rect), result);
-        }
-    }
-
-    #[test]
-    fn check_horizontal_line() {
-        let points = parse_points(INPUT);
-        let polygon = get_edges(&points);
-        let edge = [[9, 7], [11, 7]];
-        assert_eq!(check_if_point_is_contained(&polygon, &edge[0]), true);
-        assert_eq!(check_if_point_is_contained(&polygon, &edge[1]), true);
-        let edge = [[2, 5], [9, 5]];
-        assert_eq!(check_if_point_is_contained(&polygon, &edge[0]), true);
-        assert_eq!(check_if_point_is_contained(&polygon, &edge[1]), true);
-    }
-
-    #[test]
-    fn check_rect_pts_inside_but_edge_crosses() {
-        // polygon is like a giant C
-        let polygon = get_edges(&[
-            [0, 10],
-            [10, 10],
-            [10, 8],
-            [2, 8],
-            [2, 2],
-            [10, 2],
-            [10, 0],
-            [0, 0],
-        ]);
-        let rect = [[1, 1], [9, 9]];
-        assert_eq!(check_if_rectangle_is_contained(&polygon, rect), false);
-    }
-
-    #[test]
-    fn check_edge_intersection() {
-        let edges = [
-            ([[7, 1], [7, 9]], [[2, 5], [9, 5]], true),
-            ([[7, 1], [7, 9]], [[2, 5], [5, 5]], false),
-            ([[9, 9], [9, 1]], [[2, 2], [10, 2]], true),
-            ([[9, 9], [9, 1]], [[2, 8], [10, 8]], true),
-        ];
-        for (a, b, result) in edges {
-            assert_eq!(check_for_edge_intersection(&[a], &[b]), result);
+            println!("Testing {rect:?}");
+            assert_eq!(rect.check(&vert, &horiz), result);
         }
     }
 }
