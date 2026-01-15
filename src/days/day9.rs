@@ -27,6 +27,8 @@ fn solution1(input: &str) -> i64 {
         let [ax, ay] = points[i];
         for j in i + 1..n {
             let [bx, by] = points[j];
+            // have to add one to the length of the sides because we're dealing with tile coordinates and not the
+            // actual corners
             let dx = (bx - ax).abs() + 1;
             let dy = (by - ay).abs() + 1;
             areas.push(dx * dy);
@@ -53,7 +55,7 @@ fn solution2(input: &str) -> i64 {
     }
     rectangles.sort_unstable_by_key(|&(area, _)| area);
 
-    // find the vertical edges of the polygon as with the winding number test we
+    // find the vertical edges of the polygon separately as with the winding number test we
     // are doing, only the vertical edges matter
     let (vertical_edges, horizontal_edges) = get_separated_edges(&points);
 
